@@ -1,0 +1,330 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Flag Drill</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,800&family=Figtree:wght@400;500;600&family=JetBrains+Mono:wght@500&display=swap">
+<style>
+/* Layout: one centered column. Deck and filter chips on top, the flag on a "signal board", answers below. */
+:root {
+  --bg: #eef1f5; --panel: #ffffff; --ink: #14202e; --muted: #5b6878; --line: #d5dce5;
+  --accent: #1f4fd1; --accent-ink: #ffffff; --good: #1d8a4e; --good-bg: #e2f4ea;
+  --bad: #c2362f; --bad-bg: #fbe6e4; --board: #e3e8ef;
+  --display: "Bricolage Grotesque", "Segoe UI", system-ui, sans-serif;
+  --body: "Figtree", "Segoe UI", system-ui, sans-serif;
+  --mono: "JetBrains Mono", ui-monospace, Menlo, Consolas, monospace;
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) { :root {
+  --bg: #0f151d; --panel: #18212c; --ink: #e8edf3; --muted: #95a2b2; --line: #2b3746;
+  --accent: #6f95ff; --accent-ink: #0b1220; --good: #4fcf88; --good-bg: #13301f;
+  --bad: #ff7a70; --bad-bg: #3a1a18; --board: #222d3a; color-scheme: dark;
+} }
+* { box-sizing: border-box; }
+html, body { margin: 0; }
+body {
+  background: var(--bg); color: var(--ink); font-family: var(--body); font-size: 16px; line-height: 1.5;
+  padding: 24px max(16px, env(safe-area-inset-right, 0px)) 48px max(16px, env(safe-area-inset-left, 0px));
+}
+.wrap { max-width: 680px; margin: 0 auto; display: flex; flex-direction: column; gap: 20px; }
+header { display: flex; justify-content: space-between; align-items: end; gap: 12px; flex-wrap: wrap; }
+h1 { font-family: var(--display); font-weight: 800; font-size: 2rem; line-height: 1; margin: 0; letter-spacing: -0.02em; }
+h1 span { color: var(--accent); }
+.stats { display: flex; gap: 18px; font-family: var(--mono); font-size: 0.85rem; font-variant-numeric: tabular-nums; }
+.stat { display: flex; flex-direction: column; align-items: flex-end; }
+.stat small { font-family: var(--body); font-size: 0.68rem; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); }
+.stat b { font-weight: 500; font-size: 1.1rem; }
+
+.controls { display: flex; flex-direction: column; gap: 10px; }
+.row { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; }
+.row-label { font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); width: 56px; flex: none; }
+.chip {
+  font: 500 0.85rem var(--body); color: var(--ink); background: transparent; border: 1px solid var(--line);
+  border-radius: 999px; padding: 4px 12px; cursor: pointer;
+}
+.chip small { color: var(--muted); font-family: var(--mono); font-size: 0.72rem; margin-left: 4px; }
+.chip:hover { border-color: var(--accent); }
+.chip[aria-pressed="true"] { background: var(--ink); color: var(--bg); border-color: var(--ink); }
+.chip[aria-pressed="true"] small { color: var(--bg); opacity: .7; }
+.chip:focus-visible, .opt:focus-visible, .btn:focus-visible, input:focus-visible, a:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+.card { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 20px; display: flex; flex-direction: column; gap: 18px; }
+.progress { display: flex; justify-content: space-between; font-size: 0.8rem; color: var(--muted); font-family: var(--mono); font-variant-numeric: tabular-nums; }
+.bar { height: 4px; background: var(--board); border-radius: 2px; overflow: hidden; }
+.bar i { display: block; height: 100%; background: var(--accent); width: 0; transition: width .3s; }
+.board { background: var(--board); border-radius: 10px; padding: clamp(16px, 5vw, 36px); height: clamp(200px, 48vw, 300px); display: flex; overflow: hidden; }
+/* The image always fills the board and scales the flag to fit inside it, whatever size the SVG file declares.
+   drop-shadow follows the flag's own edges rather than the empty space around it. */
+.flag { width: 100%; height: 100%; min-width: 0; min-height: 0; object-fit: contain; display: block; filter: drop-shadow(0 4px 10px rgba(20,32,46,.22)); }
+
+.opts { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+@media (max-width: 460px) { .opts { grid-template-columns: 1fr; } }
+.opt {
+  font: 600 0.98rem var(--body); color: var(--ink); text-align: left; background: var(--panel);
+  border: 1.5px solid var(--line); border-radius: 10px; padding: 12px 14px; cursor: pointer;
+  display: flex; gap: 10px; align-items: center; min-width: 0;
+}
+.opt kbd { font-family: var(--mono); font-size: 0.72rem; color: var(--muted); border: 1px solid var(--line); border-radius: 4px; padding: 0 5px; flex: none; }
+.opt:hover:not(:disabled) { border-color: var(--accent); }
+.opt:disabled { cursor: default; }
+.opt.right { border-color: var(--good); background: var(--good-bg); }
+.opt.wrong { border-color: var(--bad); background: var(--bad-bg); }
+
+.btn { font: 600 0.95rem var(--body); background: var(--accent); color: var(--accent-ink); border: 0; border-radius: 10px; padding: 11px 18px; cursor: pointer; }
+.btn.ghost { background: transparent; color: var(--ink); border: 1px solid var(--line); }
+
+.feedback { min-height: 3em; display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; flex-wrap: wrap; }
+.feedback > div { flex: 1 1 300px; min-width: 0; display: flex; flex-direction: column; gap: 4px; }
+.feedback p { margin: 0; }
+.verdict { font-weight: 600; }
+.verdict.good { color: var(--good); }
+.verdict.bad { color: var(--bad); }
+.where { font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); }
+.fact { color: var(--muted); font-size: 0.9rem; max-width: 62ch; }
+.fact a { color: var(--accent); }
+
+.done { text-align: center; display: flex; flex-direction: column; gap: 14px; align-items: center; }
+.done h2 { font-family: var(--display); font-weight: 800; font-size: 2.6rem; margin: 0; line-height: 1; }
+.done p { margin: 0; color: var(--muted); }
+.missed { display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; }
+.missed figure { margin: 0; width: 96px; display: flex; flex-direction: column; gap: 4px; align-items: center; }
+.missed img { width: 96px; height: 64px; object-fit: contain; filter: drop-shadow(0 1px 3px rgba(0,0,0,.2)); }
+.missed figcaption { font-size: 0.72rem; line-height: 1.2; text-align: center; color: var(--muted); }
+.done .row { justify-content: center; }
+footer { font-size: 0.78rem; color: var(--muted); text-align: center; }
+footer a { color: inherit; }
+@media (prefers-reduced-motion: reduce) { .bar i { transition: none; } }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>Flag <span>Drill</span></h1>
+    <div class="stats">
+      <div class="stat"><small>Score</small><b id="score">0 / 0</b></div>
+      <div class="stat"><small>Streak</small><b id="streak">0</b></div>
+      <div class="stat"><small>Best</small><b id="best">0</b></div>
+    </div>
+  </header>
+
+  <div class="controls">
+    <div class="row" id="decks"><span class="row-label">Deck</span></div>
+    <div class="row" id="groups"><span class="row-label">Filter</span></div>
+  </div>
+
+  <main class="card" id="card"></main>
+
+  <footer>Flag details from <a href="https://github.com/niemela/flags">niemela/flags</a> (CC BY-SA 4.0). Images from Wikimedia Commons. See <a href="CREDITS.md">credits</a>.</footer>
+</div>
+
+<template id="quiz-tpl">
+  <div>
+    <div class="progress"><span id="prog"></span><span id="pct"></span></div>
+    <div class="bar"><i id="bar"></i></div>
+  </div>
+  <div class="board"><img class="flag" id="flag" alt="Flag to identify"></div>
+  <div class="opts" id="opts"></div>
+  <div class="feedback">
+    <div>
+      <p class="verdict" id="verdict"></p>
+      <p class="where" id="where"></p>
+      <p class="fact" id="fact"></p>
+    </div>
+    <button class="btn" id="next" hidden>Next flag →</button>
+  </div>
+</template>
+
+<script src="data/decks.js"></script>
+<script>
+// ---------- Data ----------
+const DECKS = window.DECKS || [];
+// "All flags" mixes every deck. Each flag remembers which deck it came from.
+DECKS.forEach(d => d.items.forEach(it => it.deck = d.id));
+const ALL_DECK = { id: "all", name: "All flags", items: DECKS.flatMap(d => d.items) };
+const DECK_LIST = [ALL_DECK, ...DECKS];
+const byId = id => DECK_LIST.find(d => d.id === id);
+
+// Group labels shown above the filter chips, per deck
+const GROUP_WORD = { countries: "continent", territories: "country", "europe-regions": "country", former: "region" };
+
+// ---------- State ----------
+let deckId = "countries", group = "All";
+let deck = [], idx = 0, right = 0, answered = 0, streak = 0, missed = [], locked = false;
+let best = 0;
+try { best = Number(localStorage.getItem("flagdrill-best")) || 0; } catch (e) {}
+
+const $ = id => document.getElementById(id);
+const shuffle = a => { a = a.slice(); for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; };
+const norm = s => s.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().replace(/&/g, "and").replace(/[^a-z0-9 ]/g, " ").replace(/\s+/g, " ").trim();
+const currentDeck = () => byId(deckId);
+const pool = () => currentDeck().items.filter(it => group === "All" || it.group === group);
+
+// ---------- Controls ----------
+function buildDeckChips() {
+  DECK_LIST.forEach(d => {
+    const b = document.createElement("button");
+    b.className = "chip"; b.dataset.deck = d.id;
+    b.innerHTML = `<span></span><small>${d.items.length}</small>`;
+    b.querySelector("span").textContent = d.name;
+    b.onclick = () => { deckId = d.id; group = "All"; buildGroupChips(); syncChips(); start(pool()); setHash(); };
+    $("decks").appendChild(b);
+  });
+}
+
+function buildGroupChips() {
+  const row = $("groups");
+  row.querySelectorAll(".chip").forEach(c => c.remove());
+  const groups = [...new Set(currentDeck().items.map(it => it.group))];
+  row.hidden = deckId === "all" || groups.length < 2;
+  row.querySelector(".row-label").textContent = GROUP_WORD[deckId] ? "By " + GROUP_WORD[deckId] : "Filter";
+  ["All", ...groups].forEach(g => {
+    const b = document.createElement("button");
+    b.className = "chip"; b.dataset.group = g; b.textContent = g;
+    b.onclick = () => { group = g; syncChips(); start(pool()); };
+    row.appendChild(b);
+  });
+}
+
+function syncChips() {
+  document.querySelectorAll("[data-deck]").forEach(b => b.setAttribute("aria-pressed", b.dataset.deck === deckId));
+  document.querySelectorAll("[data-group]").forEach(b => b.setAttribute("aria-pressed", b.dataset.group === group));
+}
+
+// Bookmarkable decks: flagdrill/#us-states opens straight to that deck
+function setHash() { history.replaceState(null, "", "#" + deckId); }
+function readHash() { const h = location.hash.slice(1); if (byId(h)) deckId = h; }
+
+// ---------- Game loop ----------
+function start(list) {
+  deck = shuffle(list); idx = 0; right = 0; answered = 0; missed = [];
+  $("card").innerHTML = $("quiz-tpl").innerHTML;
+  wire();
+  render();
+}
+
+function render() {
+  const c = deck[idx];
+  locked = false;
+  const img = $("flag");
+  img.onerror = () => { if (deck[idx] === c) next(); };  // skip a flag whose image won't load
+  img.src = c.img;
+  $("prog").textContent = `Flag ${idx + 1} of ${deck.length}`;
+  $("pct").textContent = answered ? Math.round(100 * right / answered) + "% correct" : "";
+  $("bar").style.width = (100 * idx / deck.length) + "%";
+  $("verdict").textContent = ""; $("verdict").className = "verdict";
+  $("where").textContent = "";
+  $("fact").textContent = "Pick the right name. Keys 1 to 4 work too.";
+  $("next").hidden = true;
+  buildOptions(c);
+  updateStats();
+}
+
+// Wrong answers: same group first (same continent, same country...), then the rest of the same deck.
+// This keeps them believable: a Texas flag gets other U.S. states, not "Japan".
+function buildOptions(c) {
+  const home = byId(c.deck).items.filter(x => x.name !== c.name);
+  const near = shuffle(home.filter(x => x.group === c.group));
+  const far = shuffle(home.filter(x => x.group !== c.group));
+  const choices = shuffle([c, ...near.concat(far).slice(0, 3)]);
+  $("opts").innerHTML = "";
+  choices.forEach((x, i) => {
+    const b = document.createElement("button");
+    b.className = "opt"; b.dataset.name = x.name;
+    b.innerHTML = `<kbd>${i + 1}</kbd><span></span>`;
+    b.querySelector("span").textContent = x.name;
+    b.onclick = () => answer(x.name === c.name, b);
+    $("opts").appendChild(b);
+  });
+}
+
+function answer(correct, btn) {
+  if (locked) return;
+  locked = true; answered++;
+  const c = deck[idx];
+  if (correct) {
+    right++; streak++;
+    if (streak > best) { best = streak; try { localStorage.setItem("flagdrill-best", best); } catch (e) {} }
+  } else { streak = 0; missed.push(c); }
+
+  document.querySelectorAll(".opt").forEach(b => {
+    b.disabled = true;
+    if (b.dataset.name === c.name) b.classList.add("right");
+  });
+  if (!correct && btn) btn.classList.add("wrong");
+  $("verdict").textContent = correct ? `Correct: ${c.name}` : `It's ${c.name}`;
+  $("verdict").className = "verdict " + (correct ? "good" : "bad");
+  $("where").textContent = [byId(c.deck).name, c.group].join(" · ");
+  const fact = $("fact");
+  fact.textContent = c.fact ? c.fact + " " : "";
+  if (c.source) {
+    const a = document.createElement("a");
+    a.href = c.source; a.target = "_blank"; a.rel = "noopener"; a.textContent = "More about this flag";
+    fact.appendChild(a);
+  }
+  $("next").hidden = false; $("next").focus();
+  updateStats();
+}
+
+function next() {
+  idx++;
+  if (idx >= deck.length) return finish();
+  render();
+}
+
+function finish() {
+  const pct = answered ? Math.round(100 * right / answered) : 0;
+  const label = currentDeck().name + (group !== "All" ? " · " + group : "");
+  $("card").innerHTML = `
+    <div class="done">
+      <p id="done-label"></p>
+      <h2>${right} / ${answered}</h2>
+      <p>${pct}% correct${missed.length ? ` · ${missed.length} to review` : " · no misses"}</p>
+      <div class="missed" id="missed"></div>
+      <div class="row">
+        ${missed.length ? '<button class="btn" id="review">Review my misses</button>' : ""}
+        <button class="btn ghost" id="again">Start over</button>
+      </div>
+    </div>`;
+  $("done-label").textContent = label;
+  missed.forEach(m => {
+    const f = document.createElement("figure");
+    f.innerHTML = `<img alt=""><figcaption></figcaption>`;
+    f.querySelector("img").src = m.img; f.querySelector("img").alt = m.name + " flag";
+    f.querySelector("figcaption").textContent = m.name;
+    $("missed").appendChild(f);
+  });
+  if (missed.length) $("review").onclick = () => start(missed);
+  $("again").onclick = () => start(pool());
+}
+
+function updateStats() {
+  $("score").textContent = `${right} / ${answered}`;
+  $("streak").textContent = streak;
+  $("best").textContent = best;
+}
+
+function wire() {
+  $("next").onclick = next;
+}
+
+document.addEventListener("keydown", e => {
+  if (!$("flag")) return;
+  if (!locked && /^[1-4]$/.test(e.key)) {
+    const b = document.querySelectorAll(".opt")[Number(e.key) - 1];
+    if (b) b.click();
+  } else if (locked && e.key === "Enter" && document.activeElement !== $("next")) {
+    e.preventDefault(); next();
+  }
+});
+
+// ---------- Start ----------
+readHash();
+buildDeckChips();
+buildGroupChips();
+syncChips();
+start(pool());
+</script>
+</body>
+</html>
