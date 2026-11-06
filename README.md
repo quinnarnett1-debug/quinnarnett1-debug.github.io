@@ -1,4 +1,4 @@
-# Flag Drill
+# Flag Master
 
 A flag quiz with 573 flags in nine decks: countries, territories, U.S. states, Canadian provinces and territories, Australian states, Mexican states, Brazilian states, European regions, and former countries.
 
